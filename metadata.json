@@ -1,0 +1,6 @@
+{
+  "name": "Minecraft Typing Defense - ZType Voxel",
+  "description": "Jogo de digitação estilo ZType com estética de blocos voxel pixel art de Minecraft, lasers e vocabulário em português.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
