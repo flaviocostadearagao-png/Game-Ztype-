@@ -220,6 +220,34 @@ class SoundEngine {
     }
   }
 
+  // Soft UI Button Click sound
+  playClick() {
+    if (!this.soundEnabled) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(600, now);
+      osc.frequency.exponentialRampToValueAtTime(300, now + 0.04);
+
+      gain.gain.setValueAtTime(this.sfxVolume * 0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.01, now + 0.04);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.04);
+    } catch {
+      // Audio fallback
+    }
+  }
+
   // Level Up Fanfare
   playLevelUp() {
     if (!this.soundEnabled) return;

@@ -334,209 +334,173 @@ export function useGameEngine(
     const activeBlocks = blocksRef.current;
     if (activeBlocks.length === 0) return;
 
-    const currentTarget = activeBlocks.find((b) => b.id === targetIdRef.current);
+    // 1. Check current target first
+    let targetToHit = activeBlocks.find((b) => b.id === targetIdRef.current);
 
-    if (currentTarget) {
-      // Locking active on a target block
-      const targetChar = currentTarget.word[currentTarget.typedIndex];
+    // Is current target matching key at current typedIndex?
+    if (targetToHit && !isCharMatch(key, targetToHit.word[targetToHit.typedIndex || 0], settings.forgiveAccents)) {
+      // Key doesn't match current target -> FREE TARGETING ("deixe livre")
+      // Reset previous target's typed progress when switching away
+      targetToHit = undefined;
+    }
 
-      if (isCharMatch(key, targetChar, settings.forgiveAccents)) {
-        // MATCH! Advance typed index
-        soundEngine.playTypeLaser();
+    // 2. If no current target or key didn't match current target, find ANY block matching key at its typedIndex
+    if (!targetToHit) {
+      // Find blocks matching key at b.typedIndex, sorted by Y descending (closest to ground first)
+      const matchingBlocks = activeBlocks
+        .filter((b) => isCharMatch(key, b.word[b.typedIndex || 0], settings.forgiveAccents))
+        .sort((a, b) => b.y - a.y);
 
-        const nextTypedIndex = currentTarget.typedIndex + 1;
-        const isComplete = nextTypedIndex >= currentTarget.word.length;
+      if (matchingBlocks.length > 0) {
+        targetToHit = matchingBlocks[0];
+        setCurrentTargetId(targetToHit.id);
+      }
+    }
 
-        // Fire Laser Beam
-        const newLaser: LaserBeam = {
-          id: `laser_${Date.now()}_${Math.random()}`,
-          startX: stevePos.x,
-          startY: stevePos.y - 30,
-          endX: currentTarget.x,
-          endY: currentTarget.y,
-          progress: 0,
-          color: '#00ffff',
-          width: 4,
-          duration: 6,
-          charTyped: key.toUpperCase(),
+    if (targetToHit) {
+      // MATCH FOUND!
+      soundEngine.playTypeLaser();
+
+      const currentTypedIdx = targetToHit.typedIndex || 0;
+      const nextTypedIndex = currentTypedIdx + 1;
+      const isComplete = nextTypedIndex >= targetToHit.word.length;
+
+      // Fire Laser Beam
+      const newLaser: LaserBeam = {
+        id: `laser_${Date.now()}_${Math.random()}`,
+        startX: stevePos.x,
+        startY: stevePos.y - 30,
+        endX: targetToHit.x,
+        endY: targetToHit.y,
+        progress: 0,
+        color: '#00ffff',
+        width: 4,
+        duration: 6,
+        charTyped: key.toUpperCase(),
+      };
+      setLasers((prev) => [...prev, newLaser]);
+
+      // Hit particles at block
+      spawnBlockExplosion(targetToHit.x, targetToHit.y, '#00ffff', 5);
+
+      const activeTargetId = targetToHit.id;
+
+      // Update Block state
+      setEnemyBlocks((prev) =>
+        prev.map((b) => {
+          if (b.id === activeTargetId) {
+            return {
+              ...b,
+              typedIndex: nextTypedIndex,
+              shakeAmount: 6,
+              targetLock: true,
+            };
+          }
+          // Reset other blocks' targetLock when switching targets
+          return { ...b, targetLock: false };
+        })
+      );
+
+      // Update Stats & WPM
+      setStats((prev) => {
+        const nextLetters = prev.lettersTyped + 1;
+        const nextCombo = prev.combo + 1;
+        const nextMaxCombo = Math.max(prev.maxCombo, nextCombo);
+        const elapsedMin = Math.max(0.1, (Date.now() - prev.startTime) / 60000);
+        const calculatedWpm = Math.round((nextLetters / 5) / elapsedMin);
+        const accuracy = Math.round((nextLetters / Math.max(1, nextLetters + prev.mistakes)) * 100);
+
+        return {
+          ...prev,
+          lettersTyped: nextLetters,
+          combo: nextCombo,
+          maxCombo: nextMaxCombo,
+          wpm: calculatedWpm,
+          accuracy,
         };
-        setLasers((prev) => [...prev, newLaser]);
+      });
 
-        // Hit particles at block
-        spawnBlockExplosion(currentTarget.x, currentTarget.y, '#00ffff', 5);
+      // Block Destroyed Complete!
+      if (isComplete) {
+        soundEngine.playBlockBreak(targetToHit.type);
 
-        // Update Block state
-        setEnemyBlocks((prev) =>
-          prev.map((b) => {
-            if (b.id === currentTarget.id) {
-              return {
-                ...b,
-                typedIndex: nextTypedIndex,
-                shakeAmount: 6,
-              };
-            }
-            return b;
-          })
-        );
+        // Calculate Combo Multiplier
+        const currentCombo = statsRef.current.combo + 1;
+        const comboMult = 1 + Math.floor(currentCombo / 5) * 0.5;
+        const earnedXP = Math.round(targetToHit.points * comboMult);
 
-        // Update Stats & WPM
+        // Spawn large particle blast
+        const blockColor = targetToHit.type === 'dirt' ? '#866043' :
+                           targetToHit.type === 'diamond' ? '#00ffff' :
+                           targetToHit.type === 'gold' ? '#fcee4b' :
+                           targetToHit.type === 'redstone' ? '#ff2200' : '#737373';
+
+        spawnBlockExplosion(targetToHit.x, targetToHit.y, blockColor, 22);
+
+        // Spawn Floating XP/Score Text
+        const newFloatingText: FloatingText = {
+          id: `ft_${Date.now()}`,
+          text: `+${earnedXP} XP!`,
+          x: targetToHit.x,
+          y: targetToHit.y - 15,
+          color: '#00ff44',
+          life: 35,
+          maxLife: 35,
+          scale: 1,
+          isCritical: currentCombo >= 5,
+        };
+        setFloatingTexts((prev) => [...prev, newFloatingText]);
+
+        // Remove block & Unlock Target
+        setEnemyBlocks((prev) => prev.filter((b) => b.id !== activeTargetId));
+        setCurrentTargetId(null);
+
+        // Random chance for Powerup drop (12%)
+        if (Math.random() < 0.12) {
+          const types: (keyof PowerUpInventory)[] = ['tnt_nuke', 'freeze_clock', 'golden_apple', 'redstone_laser'];
+          const drop = types[Math.floor(Math.random() * types.length)];
+          setPowerups((prev) => ({ ...prev, [drop]: prev[drop] + 1 }));
+          soundEngine.playExpOrb();
+        }
+
+        // Update Score & Check Level Up
         setStats((prev) => {
-          const nextLetters = prev.lettersTyped + 1;
-          const nextCombo = prev.combo + 1;
-          const nextMaxCombo = Math.max(prev.maxCombo, nextCombo);
-          const elapsedMin = Math.max(0.1, (Date.now() - prev.startTime) / 60000);
-          const calculatedWpm = Math.round((nextLetters / 5) / elapsedMin);
-          const accuracy = Math.round((nextLetters / Math.max(1, nextLetters + prev.mistakes)) * 100);
+          const nextScore = prev.score + earnedXP;
+          const nextWords = prev.wordsTyped + 1;
+          const nextDestroyed = prev.blocksDestroyed + 1;
+
+          // Check level transition (every 8 blocks destroyed)
+          let nextLevel = prev.level;
+          let nextWave = prev.wave;
+          if (nextDestroyed % 8 === 0) {
+            nextLevel += 1;
+            nextWave += 1;
+            soundEngine.playLevelUp();
+
+            // Transition Biome as levels progress
+            if (nextLevel === 4) setBiome('nether');
+            if (nextLevel === 8) setBiome('the_end');
+            if (nextLevel === 12) setBiome('deep_dark');
+          }
 
           return {
             ...prev,
-            lettersTyped: nextLetters,
-            combo: nextCombo,
-            maxCombo: nextMaxCombo,
-            wpm: calculatedWpm,
-            accuracy,
+            score: nextScore,
+            wordsTyped: nextWords,
+            blocksDestroyed: nextDestroyed,
+            level: nextLevel,
+            wave: nextWave,
           };
         });
-
-        // Block Destroyed Complete!
-        if (isComplete) {
-          soundEngine.playBlockBreak(currentTarget.type);
-
-          // Calculate Combo Multiplier
-          const currentCombo = statsRef.current.combo + 1;
-          const comboMult = 1 + Math.floor(currentCombo / 5) * 0.5;
-          const earnedXP = Math.round(currentTarget.points * comboMult);
-
-          // Spawn large particle blast
-          const blockColor = currentTarget.type === 'dirt' ? '#866043' :
-                             currentTarget.type === 'diamond' ? '#00ffff' :
-                             currentTarget.type === 'gold' ? '#fcee4b' :
-                             currentTarget.type === 'redstone' ? '#ff2200' : '#737373';
-
-          spawnBlockExplosion(currentTarget.x, currentTarget.y, blockColor, 22);
-
-          // Spawn Floating XP/Score Text
-          const newFloatingText: FloatingText = {
-            id: `ft_${Date.now()}`,
-            text: `+${earnedXP} XP!`,
-            x: currentTarget.x,
-            y: currentTarget.y - 15,
-            color: '#00ff44',
-            life: 35,
-            maxLife: 35,
-            scale: 1,
-            isCritical: currentCombo >= 5,
-          };
-          setFloatingTexts((prev) => [...prev, newFloatingText]);
-
-          // Remove block & Unlock Target
-          setEnemyBlocks((prev) => prev.filter((b) => b.id !== currentTarget.id));
-          setCurrentTargetId(null);
-
-          // Random chance for Powerup drop (12%)
-          if (Math.random() < 0.12) {
-            const types: (keyof PowerUpInventory)[] = ['tnt_nuke', 'freeze_clock', 'golden_apple', 'redstone_laser'];
-            const drop = types[Math.floor(Math.random() * types.length)];
-            setPowerups((prev) => ({ ...prev, [drop]: prev[drop] + 1 }));
-            soundEngine.playExpOrb();
-          }
-
-          // Update Score & Check Level Up
-          setStats((prev) => {
-            const nextScore = prev.score + earnedXP;
-            const nextWords = prev.wordsTyped + 1;
-            const nextDestroyed = prev.blocksDestroyed + 1;
-
-            // Check level transition (every 8 blocks destroyed)
-            let nextLevel = prev.level;
-            let nextWave = prev.wave;
-            if (nextDestroyed % 8 === 0) {
-              nextLevel += 1;
-              nextWave += 1;
-              soundEngine.playLevelUp();
-
-              // Transition Biome as levels progress
-              if (nextLevel === 4) setBiome('nether');
-              if (nextLevel === 8) setBiome('the_end');
-              if (nextLevel === 12) setBiome('deep_dark');
-            }
-
-            return {
-              ...prev,
-              score: nextScore,
-              wordsTyped: nextWords,
-              blocksDestroyed: nextDestroyed,
-              level: nextLevel,
-              wave: nextWave,
-            };
-          });
-        }
-      } else {
-        // MISMATCH Key on current locked target
-        soundEngine.playError();
-        setStats((prev) => ({
-          ...prev,
-          mistakes: prev.mistakes + 1,
-          combo: 0,
-        }));
       }
     } else {
-      // NO CURRENT TARGET -> Find first block matching first letter!
-      const matchingBlock = activeBlocks.find((b) =>
-        isCharMatch(key, b.word[0], settings.forgiveAccents)
-      );
-
-      if (matchingBlock) {
-        // Lock onto this matching block!
-        setCurrentTargetId(matchingBlock.id);
-
-        // Advance first letter immediately!
-        soundEngine.playTypeLaser();
-
-        // Fire Laser
-        const newLaser: LaserBeam = {
-          id: `laser_${Date.now()}_${Math.random()}`,
-          startX: stevePos.x,
-          startY: stevePos.y - 30,
-          endX: matchingBlock.x,
-          endY: matchingBlock.y,
-          progress: 0,
-          color: '#00ffff',
-          width: 4,
-          duration: 6,
-          charTyped: key.toUpperCase(),
-        };
-        setLasers((prev) => [...prev, newLaser]);
-
-        // Update target block
-        setEnemyBlocks((prev) =>
-          prev.map((b) => {
-            if (b.id === matchingBlock.id) {
-              return {
-                ...b,
-                typedIndex: 1,
-                targetLock: true,
-                shakeAmount: 6,
-              };
-            }
-            return { ...b, targetLock: false };
-          })
-        );
-
-        setStats((prev) => ({
-          ...prev,
-          lettersTyped: prev.lettersTyped + 1,
-          combo: prev.combo + 1,
-        }));
-      } else {
-        // MISMATCH -> No block starts with this character
-        soundEngine.playError();
-        setStats((prev) => ({
-          ...prev,
-          mistakes: prev.mistakes + 1,
-          combo: 0,
-        }));
-      }
+      // MISMATCH Key on all active blocks
+      soundEngine.playError();
+      setStats((prev) => ({
+        ...prev,
+        mistakes: prev.mistakes + 1,
+        combo: 0,
+      }));
     }
   }, [settings.forgiveAccents, stevePos.x, stevePos.y, triggerPowerup]);
 

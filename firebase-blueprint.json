@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "leaderboard": {
+      "title": "Global Leaderboard",
+      "description": "High score records submitted by players",
+      "type": "object",
+      "properties": {
+        "playerName": {
+          "type": "string",
+          "description": "Player nickname displayed in leaderboard"
+        },
+        "score": {
+          "type": "number",
+          "description": "Final score achieved"
+        },
+        "wpm": {
+          "type": "number",
+          "description": "Words per minute speed"
+        },
+        "accuracy": {
+          "type": "number",
+          "description": "Typing accuracy percentage"
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "Game difficulty played"
+        },
+        "levelReached": {
+          "type": "number",
+          "description": "Level reached in the game"
+        },
+        "userId": {
+          "type": "string",
+          "description": "Anonymous or authenticated Firebase User ID"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Submission timestamp"
+        }
+      },
+      "required": ["playerName", "score", "wpm", "accuracy", "difficulty", "userId", "createdAt"]
+    }
+  },
+  "securityRules": [
+    {
+      "collection": "leaderboard",
+      "read": "true",
+      "create": "request.auth != null",
+      "update": "request.auth != null && request.auth.uid == resource.data.userId",
+      "delete": "request.auth != null && request.auth.uid == resource.data.userId"
+    }
+  ]
+}

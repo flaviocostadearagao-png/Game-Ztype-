@@ -7,7 +7,6 @@ import { CanvasGame } from './components/CanvasGame';
 import { MinecraftHUD } from './components/MinecraftHUD';
 import { GameOverlay } from './components/GameOverlay';
 import { WordListModal } from './components/WordListModal';
-import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { useGameEngine } from './hooks/useGameEngine';
 import { GameSettings, PowerUpInventory } from './types';
 import { soundEngine } from './utils/audio';
@@ -29,6 +28,7 @@ export default function App() {
   // Game Engine State & Handlers
   const {
     status,
+    setStatus,
     hearts,
     maxHearts,
     stats,
@@ -41,8 +41,6 @@ export default function App() {
     floatingTexts,
     stevePos,
     isFrozen,
-    isVirtualKeyboardOpen,
-    setIsVirtualKeyboardOpen,
     sendVirtualKey,
     selectTargetBlock,
     startGame,
@@ -80,6 +78,13 @@ export default function App() {
     }
   }, []);
 
+  const handleStartGameWithInput = useCallback(() => {
+    startGame();
+    setTimeout(() => {
+      focusNativeInput();
+    }, 100);
+  }, [startGame, focusNativeInput]);
+
   const handleHiddenInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value.length > 0) {
@@ -90,8 +95,11 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen h-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none">
-      {/* Hidden input element for native mobile soft keyboard support */}
+    <div
+      onClick={focusNativeInput}
+      className="w-screen h-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none"
+    >
+      {/* Hidden input element for native mobile/desktop device keyboard support */}
       <input
         ref={hiddenInputRef}
         type="text"
@@ -127,37 +135,23 @@ export default function App() {
             hearts={hearts}
             maxHearts={maxHearts}
             stats={stats}
-            powerups={powerups}
             currentTargetBlock={currentTargetBlock}
             isFrozen={isFrozen}
-            onTriggerPowerup={(type: keyof PowerUpInventory) => triggerPowerup(type)}
             onTogglePause={togglePause}
             soundEnabled={soundEnabled}
             onToggleSound={handleToggleSound}
-            isVirtualKeyboardOpen={isVirtualKeyboardOpen}
-            onToggleVirtualKeyboard={() => setIsVirtualKeyboardOpen((prev) => !prev)}
           />
         )}
       </div>
-
-      {/* Bottom Flex Item: On-Screen Touch Virtual Keyboard */}
-      {status === 'PLAYING' && isVirtualKeyboardOpen && (
-        <VirtualKeyboard
-          onKeyPress={sendVirtualKey}
-          onClose={() => setIsVirtualKeyboardOpen(false)}
-          onFocusNativeInput={focusNativeInput}
-          powerups={powerups}
-          onTriggerPowerup={triggerPowerup}
-        />
-      )}
 
       {/* Overlays for Main Menu, Pause, Game Over */}
       <GameOverlay
         status={status}
         stats={stats}
         settings={settings}
-        onStartGame={startGame}
+        onStartGame={handleStartGameWithInput}
         onResumeGame={togglePause}
+        onGoToMenu={() => setStatus('MENU')}
         onUpdateSettings={handleUpdateSettings}
         onOpenWordListModal={() => setIsWordListOpen(true)}
       />
