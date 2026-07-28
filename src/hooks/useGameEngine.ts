@@ -101,10 +101,10 @@ export function useGameEngine(
   const waveBlocksSpawnedRef = useRef<number>(0);
   const waveTotalBlocksRef = useRef<number>(6);
 
-  // Calculate Steve position, adjusting upwards if virtual keyboard is open
+  // Calculate Steve position at bottom center of the active canvas area
   const stevePos = {
     x: canvasWidth / 2,
-    y: Math.max(120, canvasHeight - (isVirtualKeyboardOpen ? 210 : 45)),
+    y: Math.max(80, canvasHeight - 45),
   };
 
   /**

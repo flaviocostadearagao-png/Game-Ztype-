@@ -90,7 +90,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-screen h-screen relative bg-slate-950 overflow-hidden flex items-center justify-center font-pixel text-white select-none">
+    <div className="w-screen h-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none">
       {/* Hidden input element for native mobile soft keyboard support */}
       <input
         ref={hiddenInputRef}
@@ -105,39 +105,42 @@ export default function App() {
       {/* Optional Retro CRT Scanline Overlay */}
       {settings.crtFilter && <div className="absolute inset-0 crt-overlay z-20 pointer-events-none" />}
 
-      {/* Main 2D Top-Down Pixel Art Game Canvas */}
-      <CanvasGame
-        enemyBlocks={enemyBlocks}
-        currentTargetId={currentTargetId}
-        lasers={lasers}
-        particles={particles}
-        floatingTexts={floatingTexts}
-        stevePos={stevePos}
-        biome={biome}
-        onDimensionsChange={handleDimensionsChange}
-        onSelectBlock={selectTargetBlock}
-        onCanvasClick={focusNativeInput}
-      />
-
-      {/* Minecraft Pixel Art HUD overlay during gameplay */}
-      {status === 'PLAYING' && (
-        <MinecraftHUD
-          hearts={hearts}
-          maxHearts={maxHearts}
-          stats={stats}
-          powerups={powerups}
-          currentTargetBlock={currentTargetBlock}
-          isFrozen={isFrozen}
-          onTriggerPowerup={(type: keyof PowerUpInventory) => triggerPowerup(type)}
-          onTogglePause={togglePause}
-          soundEnabled={soundEnabled}
-          onToggleSound={handleToggleSound}
-          isVirtualKeyboardOpen={isVirtualKeyboardOpen}
-          onToggleVirtualKeyboard={() => setIsVirtualKeyboardOpen((prev) => !prev)}
+      {/* Top Flex Item: Game Area (Canvas & HUD) */}
+      <div className="relative w-full flex-1 min-h-0 overflow-hidden">
+        {/* Main 2D Pixel Art Game Canvas */}
+        <CanvasGame
+          enemyBlocks={enemyBlocks}
+          currentTargetId={currentTargetId}
+          lasers={lasers}
+          particles={particles}
+          floatingTexts={floatingTexts}
+          stevePos={stevePos}
+          biome={biome}
+          onDimensionsChange={handleDimensionsChange}
+          onSelectBlock={selectTargetBlock}
+          onCanvasClick={focusNativeInput}
         />
-      )}
 
-      {/* On-Screen Touch Virtual Keyboard */}
+        {/* Minecraft Pixel Art HUD overlay during gameplay */}
+        {status === 'PLAYING' && (
+          <MinecraftHUD
+            hearts={hearts}
+            maxHearts={maxHearts}
+            stats={stats}
+            powerups={powerups}
+            currentTargetBlock={currentTargetBlock}
+            isFrozen={isFrozen}
+            onTriggerPowerup={(type: keyof PowerUpInventory) => triggerPowerup(type)}
+            onTogglePause={togglePause}
+            soundEnabled={soundEnabled}
+            onToggleSound={handleToggleSound}
+            isVirtualKeyboardOpen={isVirtualKeyboardOpen}
+            onToggleVirtualKeyboard={() => setIsVirtualKeyboardOpen((prev) => !prev)}
+          />
+        )}
+      </div>
+
+      {/* Bottom Flex Item: On-Screen Touch Virtual Keyboard */}
       {status === 'PLAYING' && isVirtualKeyboardOpen && (
         <VirtualKeyboard
           onKeyPress={sendVirtualKey}
