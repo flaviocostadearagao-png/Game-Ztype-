@@ -68,7 +68,7 @@ export function useGameEngine(
 
   const [enemyBlocks, setEnemyBlocks] = useState<EnemyBlock[]>([]);
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
-  const [isVirtualKeyboardOpen, setIsVirtualKeyboardOpen] = useState<boolean>(false);
+  const [isVirtualKeyboardOpen, setIsVirtualKeyboardOpen] = useState<boolean>(true);
 
   const [lasers, setLasers] = useState<LaserBeam[]>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -127,6 +127,7 @@ export function useGameEngine(
     setFloatingTexts([]);
     setBiome('overworld_night');
     setStatus('PLAYING');
+    setIsVirtualKeyboardOpen(true);
 
     lastSpawnTimeRef.current = Date.now();
     waveBlocksSpawnedRef.current = 0;

@@ -221,14 +221,14 @@ export function drawStevePlayer(
 }
 
 /**
- * Draw Minecraft Block Enemy with Portuguese word tag
+ * Draw Floating Word Enemy with ZType target reticle & letter highlights
  */
 export function drawEnemyBlock(
   ctx: CanvasRenderingContext2D,
   block: EnemyBlock,
   time: number
 ) {
-  const { x, y, width, height, type, word, typedIndex, targetLock, shakeAmount } = block;
+  const { x, y, type, word, typedIndex, targetLock, shakeAmount } = block;
 
   // Apply hit shake offset
   let renderX = x;
@@ -238,94 +238,95 @@ export function drawEnemyBlock(
     renderY += (Math.random() - 0.5) * shakeAmount;
   }
 
-  const halfW = width / 2;
-  const halfH = height / 2;
-  const bx = renderX - halfW;
-  const by = renderY - halfH;
-
   ctx.save();
 
-  // Target lock indicator box / halo
-  if (targetLock) {
-    ctx.strokeStyle = '#00ffff';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(bx - 6, by - 6, width + 12, height + 12);
-
-    // Crosshair corners
-    const cornerSize = 8;
-    ctx.fillStyle = '#ff3300';
-    // Top-Left
-    ctx.fillRect(bx - 10, by - 10, cornerSize, 3);
-    ctx.fillRect(bx - 10, by - 10, 3, cornerSize);
-    // Top-Right
-    ctx.fillRect(bx + width + 10 - cornerSize, by - 10, cornerSize, 3);
-    ctx.fillRect(bx + width + 7, by - 10, 3, cornerSize);
-    // Bottom-Left
-    ctx.fillRect(bx - 10, by + height + 7, cornerSize, 3);
-    ctx.fillRect(bx - 10, by + height + 10 - cornerSize, 3, cornerSize);
-    // Bottom-Right
-    ctx.fillRect(bx + width + 10 - cornerSize, by + height + 7, cornerSize, 3);
-    ctx.fillRect(bx + width + 7, by + height + 10 - cornerSize, 3, cornerSize);
-  }
-
-  // Draw Block Texture according to type
-  drawBlockTexture(ctx, bx, by, width, height, type, time);
-
-  // 3D Bevel Borders
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
-  ctx.fillRect(bx, by, width, 3); // Top highlight
-  ctx.fillRect(bx, by, 3, height); // Left highlight
-
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-  ctx.fillRect(bx, by + height - 3, width, 3); // Bottom shadow
-  ctx.fillRect(bx + width - 3, by, 3, height); // Right shadow
-
-  // Floating Portuguese Word Label Badge above/on the block
-  ctx.font = '13px "Press Start 2P", monospace';
+  // Set font for measuring
+  ctx.font = '15px "Press Start 2P", monospace';
   const textMetrics = ctx.measureText(word);
   const textWidth = textMetrics.width;
+  const halfTextW = textWidth / 2;
 
-  const labelPaddingX = 10;
-  const labelHeight = 24;
-  const labelX = renderX - textWidth / 2 - labelPaddingX;
-  const labelY = renderY - halfH - 32;
+  // Target lock indicator reticle around the word
+  if (targetLock) {
+    const padX = 10;
+    const padY = 6;
+    const boxX = renderX - halfTextW - padX;
+    const boxY = renderY - 14 - padY;
+    const boxW = textWidth + padX * 2;
+    const boxH = 22 + padY * 2;
 
-  // Label Background Box
-  ctx.fillStyle = targetLock ? 'rgba(0, 0, 0, 0.9)' : 'rgba(10, 10, 15, 0.8)';
-  ctx.fillRect(labelX, labelY, textWidth + labelPaddingX * 2, labelHeight);
+    // Glowing target box
+    ctx.strokeStyle = '#00ffff';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#00ffff';
+    ctx.shadowBlur = 10;
+    ctx.strokeRect(boxX, boxY, boxW, boxH);
+    ctx.shadowBlur = 0;
 
-  // Label Border
-  ctx.strokeStyle = targetLock ? '#00ffff' : '#555555';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(labelX, labelY, textWidth + labelPaddingX * 2, labelHeight);
+    // Corner crosshairs (Red/Cyan accents)
+    const cSize = 6;
+    ctx.fillStyle = '#ff3300';
+    // Top-Left
+    ctx.fillRect(boxX - 4, boxY - 4, cSize, 2);
+    ctx.fillRect(boxX - 4, boxY - 4, 2, cSize);
+    // Top-Right
+    ctx.fillRect(boxX + boxW + 4 - cSize, boxY - 4, cSize, 2);
+    ctx.fillRect(boxX + boxW + 2, boxY - 4, 2, cSize);
+    // Bottom-Left
+    ctx.fillRect(boxX - 4, boxY + boxH + 2, cSize, 2);
+    ctx.fillRect(boxX - 4, boxY + boxH + 4 - cSize, 2, cSize);
+    // Bottom-Right
+    ctx.fillRect(boxX + boxW + 4 - cSize, boxY + boxH + 2, cSize, 2);
+    ctx.fillRect(boxX + boxW + 2, boxY + boxH + 4 - cSize, 2, cSize);
+  }
 
-  // Render Typed Progress vs Remaining Characters
-  const startTextX = renderX - textWidth / 2;
-  const textY = labelY + 17;
+  // Draw word text with crisp dark outline for high contrast
+  const startTextX = renderX - halfTextW;
+  const textY = renderY;
 
+  // Base untyped color
+  let defaultUntypedColor = '#ffffff';
+  if (type === 'tnt') defaultUntypedColor = '#ff6666';
+  else if (type === 'creeper') defaultUntypedColor = '#66ff88';
+  else if (type === 'diamond') defaultUntypedColor = '#88ffff';
+  else if (type === 'gold') defaultUntypedColor = '#ffff77';
+
+  // 1. Black stroke outline behind text for 100% legibility against sky
+  ctx.fillStyle = '#000000';
+  for (let i = 0; i < word.length; i++) {
+    const char = word[i];
+    const cx = startTextX + i * 15;
+    ctx.fillText(char, cx - 2, textY);
+    ctx.fillText(char, cx + 2, textY);
+    ctx.fillText(char, cx, textY - 2);
+    ctx.fillText(char, cx, textY + 2);
+    ctx.fillText(char, cx + 2, textY + 2);
+  }
+
+  // 2. Main Character Fill with Typing Progress Effects
   for (let i = 0; i < word.length; i++) {
     const char = word[i];
     const isTyped = i < typedIndex;
     const isNext = i === typedIndex && targetLock;
+    const cx = startTextX + i * 15;
 
     if (isTyped) {
-      // Completed character -> Vivid Lime Green with Glow
+      // Completed character -> Bright glowing Lime Green
       ctx.fillStyle = '#00ff44';
       ctx.shadowColor = '#00ff44';
-      ctx.shadowBlur = 6;
+      ctx.shadowBlur = 8;
     } else if (isNext) {
       // Next character to type -> Bright Gold/Yellow
       ctx.fillStyle = '#ffea00';
       ctx.shadowColor = '#ffea00';
-      ctx.shadowBlur = 8;
+      ctx.shadowBlur = 10;
     } else {
-      // Untyped character -> Clean White
-      ctx.fillStyle = '#ffffff';
+      ctx.fillStyle = defaultUntypedColor;
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
     }
 
-    ctx.fillText(char, startTextX + i * 13, textY);
+    ctx.fillText(char, cx, textY);
     ctx.shadowBlur = 0; // Reset
   }
 

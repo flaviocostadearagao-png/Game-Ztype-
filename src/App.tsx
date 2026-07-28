@@ -142,6 +142,7 @@ export default function App() {
         <VirtualKeyboard
           onKeyPress={sendVirtualKey}
           onClose={() => setIsVirtualKeyboardOpen(false)}
+          onFocusNativeInput={focusNativeInput}
           powerups={powerups}
           onTriggerPowerup={triggerPowerup}
         />
