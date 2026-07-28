@@ -2,9 +2,10 @@
  * Minecraft Typing Defense (ZType Voxel) - Main Application Component
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { CanvasGame } from './components/CanvasGame';
 import { MinecraftHUD } from './components/MinecraftHUD';
+import { VirtualKeyboard } from './components/VirtualKeyboard';
 import { GameOverlay } from './components/GameOverlay';
 import { WordListModal } from './components/WordListModal';
 import { useGameEngine } from './hooks/useGameEngine';
@@ -14,8 +15,36 @@ import { soundEngine } from './utils/audio';
 export default function App() {
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [soundEnabled, setSoundEnabled] = useState<boolean>(true);
+  const [showVirtualKeyboard, setShowVirtualKeyboard] = useState<boolean>(true);
   const [isWordListOpen, setIsWordListOpen] = useState<boolean>(false);
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const hiddenInputRef = useRef<HTMLInputElement>(null);
+
+  // Dynamic visualViewport listener for mobile keyboard adaptability
+  useEffect(() => {
+    const updateViewportHeight = () => {
+      if (window.visualViewport) {
+        setViewportHeight(window.visualViewport.height);
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+    };
+
+    updateViewportHeight();
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', updateViewportHeight);
+      window.visualViewport.addEventListener('scroll', updateViewportHeight);
+    }
+    window.addEventListener('resize', updateViewportHeight);
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', updateViewportHeight);
+        window.visualViewport.removeEventListener('scroll', updateViewportHeight);
+      }
+      window.removeEventListener('resize', updateViewportHeight);
+    };
+  }, []);
 
   const [settings, setSettings] = useState<GameSettings>({
     difficulty: 'normal',
@@ -94,6 +123,18 @@ export default function App() {
     }
   };
 
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace') {
+      sendVirtualKey('BACKSPACE');
+    } else if (e.key === ' ') {
+      sendVirtualKey(' ');
+      e.preventDefault();
+    } else if (e.key.length === 1) {
+      sendVirtualKey(e.key);
+      e.currentTarget.value = '';
+    }
+  };
+
   const handleHiddenInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     if (value.length > 0) {
@@ -106,17 +147,22 @@ export default function App() {
   return (
     <div
       onClick={handleContainerClick}
-      className="w-screen h-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none"
+      style={{ height: viewportHeight ? `${viewportHeight}px` : '100dvh' }}
+      className="w-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none"
     >
-      {/* Hidden input element for native mobile/desktop device keyboard support */}
+      {/* Invisible input element for native mobile/desktop device keyboard focus & IME support */}
       <input
         ref={hiddenInputRef}
         type="text"
-        className="opacity-0 absolute -top-96 left-0 w-1 h-1 pointer-events-none"
-        onChange={handleHiddenInputChange}
-        autoCapitalize="characters"
+        inputMode="text"
+        enterKeyHint="go"
+        autoCapitalize="none"
         autoComplete="off"
         autoCorrect="off"
+        spellCheck={false}
+        className="opacity-0 absolute top-0 left-0 w-1 h-1 pointer-events-none"
+        onKeyDown={handleInputKeyDown}
+        onChange={handleHiddenInputChange}
       />
 
       {/* Optional Retro CRT Scanline Overlay */}
@@ -146,12 +192,30 @@ export default function App() {
             stats={stats}
             currentTargetBlock={currentTargetBlock}
             isFrozen={isFrozen}
+            showVirtualKeyboard={showVirtualKeyboard}
+            onToggleVirtualKeyboard={() => setShowVirtualKeyboard((prev) => !prev)}
             onTogglePause={togglePause}
             soundEnabled={soundEnabled}
             onToggleSound={handleToggleSound}
           />
         )}
       </div>
+
+      {/* Bottom Flex Item: On-Screen Native Controls & Hotbar split cleanly below game canvas */}
+      {status === 'PLAYING' && showVirtualKeyboard && (
+        <VirtualKeyboard
+          currentTargetBlock={currentTargetBlock}
+          activeBlocks={enemyBlocks}
+          powerups={powerups}
+          forgiveAccents={settings.forgiveAccents}
+          onKeyPress={(key) => {
+            sendVirtualKey(key);
+            focusNativeInput();
+          }}
+          onTriggerPowerup={triggerPowerup}
+          onFocusNativeInput={focusNativeInput}
+        />
+      )}
 
       {/* Overlays for Main Menu, Pause, Game Over */}
       <GameOverlay

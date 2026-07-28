@@ -4,7 +4,7 @@
 
 import React from 'react';
 import { GameStats, EnemyBlock } from '../types';
-import { Heart, Clock, Pause, Volume2, VolumeX } from 'lucide-react';
+import { Heart, Clock, Pause, Volume2, VolumeX, Keyboard } from 'lucide-react';
 
 interface MinecraftHUDProps {
   hearts: number;
@@ -12,6 +12,8 @@ interface MinecraftHUDProps {
   stats: GameStats;
   currentTargetBlock: EnemyBlock | undefined;
   isFrozen: boolean;
+  showVirtualKeyboard: boolean;
+  onToggleVirtualKeyboard: () => void;
   onTogglePause: () => void;
   soundEnabled: boolean;
   onToggleSound: () => void;
@@ -23,6 +25,8 @@ export const MinecraftHUD: React.FC<MinecraftHUDProps> = ({
   stats,
   currentTargetBlock,
   isFrozen,
+  showVirtualKeyboard,
+  onToggleVirtualKeyboard,
   onTogglePause,
   soundEnabled,
   onToggleSound,
@@ -120,6 +124,16 @@ export const MinecraftHUD: React.FC<MinecraftHUDProps> = ({
 
           {/* Quick Action Buttons */}
           <div className="flex gap-1.5 pointer-events-auto">
+            <button
+              type="button"
+              onClick={onToggleVirtualKeyboard}
+              className={`mc-btn p-1.5 sm:p-2 ${
+                showVirtualKeyboard ? 'text-yellow-300 border-yellow-400 bg-yellow-950/80' : 'text-slate-300 hover:text-white'
+              }`}
+              title="Alternar Teclado Virtual na Tela"
+            >
+              <Keyboard className="w-4 h-4" />
+            </button>
             <button
               type="button"
               onClick={onToggleSound}
