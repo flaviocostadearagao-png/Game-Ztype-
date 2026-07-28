@@ -68,6 +68,7 @@ export function useGameEngine(
 
   const [enemyBlocks, setEnemyBlocks] = useState<EnemyBlock[]>([]);
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
+  const [isVirtualKeyboardOpen, setIsVirtualKeyboardOpen] = useState<boolean>(false);
 
   const [lasers, setLasers] = useState<LaserBeam[]>([]);
   const [particles, setParticles] = useState<Particle[]>([]);
@@ -92,15 +93,18 @@ export function useGameEngine(
   const heartsRef = useRef<number>(hearts);
   heartsRef.current = hearts;
 
+  const powerupsRef = useRef<PowerUpInventory>(powerups);
+  powerupsRef.current = powerups;
+
   // Wave Manager Spawner Timer
   const lastSpawnTimeRef = useRef<number>(0);
   const waveBlocksSpawnedRef = useRef<number>(0);
   const waveTotalBlocksRef = useRef<number>(6);
 
-  // Calculate Steve position at bottom center
+  // Calculate Steve position, adjusting upwards if virtual keyboard is open
   const stevePos = {
     x: canvasWidth / 2,
-    y: canvasHeight - 45,
+    y: Math.max(120, canvasHeight - (isVirtualKeyboardOpen ? 210 : 45)),
   };
 
   /**
@@ -262,18 +266,69 @@ export function useGameEngine(
   };
 
   /**
-   * Keyboard Input Handler (Core ZType Typing Mechanics)
+   * Power-up Trigger Handlers
    */
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+  const triggerPowerup = useCallback((type: keyof PowerUpInventory) => {
+    if (powerupsRef.current[type] <= 0 || statusRef.current !== 'PLAYING') return;
+
+    // Deduct powerup charge
+    setPowerups((prev) => ({ ...prev, [type]: prev[type] - 1 }));
+
+    if (type === 'tnt_nuke') {
+      soundEngine.playExplosion();
+      // Explode all blocks!
+      blocksRef.current.forEach((b) => {
+        spawnBlockExplosion(b.x, b.y, '#d92b2b', 20);
+      });
+      setEnemyBlocks([]);
+      setCurrentTargetId(null);
+      setStats((prev) => ({ ...prev, score: prev.score + 300 }));
+    } else if (type === 'freeze_clock') {
+      soundEngine.playExpOrb();
+      isFrozenRef.current = true;
+      if (freezeTimerRef.current) clearTimeout(freezeTimerRef.current);
+      freezeTimerRef.current = window.setTimeout(() => {
+        isFrozenRef.current = false;
+      }, 5000);
+    } else if (type === 'golden_apple') {
+      soundEngine.playLevelUp();
+      setHearts((prev) => Math.min(maxHearts, prev + 3));
+    } else if (type === 'redstone_laser') {
+      // Auto-type current target or first block
+      const currentTarget = blocksRef.current.find((b) => b.id === targetIdRef.current) || blocksRef.current[0];
+      if (currentTarget) {
+        soundEngine.playBlockBreak('redstone');
+        spawnBlockExplosion(currentTarget.x, currentTarget.y, '#ff2200', 25);
+        setEnemyBlocks((prev) => prev.filter((b) => b.id !== currentTarget.id));
+        setCurrentTargetId(null);
+        setStats((prev) => ({ ...prev, score: prev.score + 250, blocksDestroyed: prev.blocksDestroyed + 1 }));
+      }
+    }
+  }, [maxHearts]);
+
+  /**
+   * Core Character Input Processor (Processes physical keys, virtual keys, and touch input)
+   */
+  const processInputKey = useCallback((key: string) => {
     if (statusRef.current !== 'PLAYING') return;
 
-    // Ignore modifier keys, system keys
-    if (e.ctrlKey || e.metaKey || e.altKey) return;
-    const key = e.key;
-    if (key.length !== 1 && key !== 'Backspace') return;
+    // Hotkeys 1-4 for powerups
+    if (key === '1') { triggerPowerup('tnt_nuke'); return; }
+    if (key === '2') { triggerPowerup('freeze_clock'); return; }
+    if (key === '3') { triggerPowerup('golden_apple'); return; }
+    if (key === '4') { triggerPowerup('redstone_laser'); return; }
 
-    // Prevent default scrolling spacebar
-    if (key === ' ') e.preventDefault();
+    // Backspace: clear current target lock
+    if (key === 'Backspace') {
+      if (targetIdRef.current) {
+        soundEngine.playError();
+        setCurrentTargetId(null);
+        setEnemyBlocks((prev) => prev.map((b) => ({ ...b, targetLock: false, typedIndex: 0 })));
+      }
+      return;
+    }
+
+    if (key.length !== 1) return;
 
     const activeBlocks = blocksRef.current;
     if (activeBlocks.length === 0) return;
@@ -482,48 +537,46 @@ export function useGameEngine(
         }));
       }
     }
-  }, [settings.forgiveAccents, stevePos.x, stevePos.y]);
+  }, [settings.forgiveAccents, stevePos.x, stevePos.y, triggerPowerup]);
 
   /**
-   * Power-up Trigger Handlers
+   * Keyboard Input Handler
    */
-  const triggerPowerup = useCallback((type: keyof PowerUpInventory) => {
-    if (powerups[type] <= 0 || statusRef.current !== 'PLAYING') return;
+  const handleKeyDown = useCallback((e: KeyboardEvent) => {
+    if (statusRef.current !== 'PLAYING') return;
 
-    // Deduct powerup charge
-    setPowerups((prev) => ({ ...prev, [type]: prev[type] - 1 }));
+    // Ignore modifier keys, system keys
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const key = e.key;
 
-    if (type === 'tnt_nuke') {
-      soundEngine.playExplosion();
-      // Explode all blocks!
-      blocksRef.current.forEach((b) => {
-        spawnBlockExplosion(b.x, b.y, '#d92b2b', 20);
-      });
-      setEnemyBlocks([]);
-      setCurrentTargetId(null);
-      setStats((prev) => ({ ...prev, score: prev.score + 300 }));
-    } else if (type === 'freeze_clock') {
-      soundEngine.playExpOrb();
-      isFrozenRef.current = true;
-      if (freezeTimerRef.current) clearTimeout(freezeTimerRef.current);
-      freezeTimerRef.current = window.setTimeout(() => {
-        isFrozenRef.current = false;
-      }, 5000);
-    } else if (type === 'golden_apple') {
-      soundEngine.playLevelUp();
-      setHearts((prev) => Math.min(maxHearts, prev + 3));
-    } else if (type === 'redstone_laser') {
-      // Auto-type current target or first block
-      const currentTarget = blocksRef.current.find((b) => b.id === targetIdRef.current) || blocksRef.current[0];
-      if (currentTarget) {
-        soundEngine.playBlockBreak('redstone');
-        spawnBlockExplosion(currentTarget.x, currentTarget.y, '#ff2200', 25);
-        setEnemyBlocks((prev) => prev.filter((b) => b.id !== currentTarget.id));
-        setCurrentTargetId(null);
-        setStats((prev) => ({ ...prev, score: prev.score + 250, blocksDestroyed: prev.blocksDestroyed + 1 }));
-      }
+    // Prevent default scrolling spacebar
+    if (key === ' ') e.preventDefault();
+
+    processInputKey(key);
+  }, [processInputKey]);
+
+  /**
+   * Direct Touch / Tap Selection on Block
+   */
+  const selectTargetBlock = useCallback((blockId: string) => {
+    if (statusRef.current !== 'PLAYING') return;
+    const targetBlock = blocksRef.current.find((b) => b.id === blockId);
+    if (!targetBlock) return;
+
+    setCurrentTargetId(targetBlock.id);
+    setEnemyBlocks((prev) =>
+      prev.map((b) => ({
+        ...b,
+        targetLock: b.id === blockId,
+      }))
+    );
+
+    // Feed first char or next char
+    const nextChar = targetBlock.word[targetBlock.typedIndex || 0];
+    if (nextChar) {
+      processInputKey(nextChar);
     }
-  }, [maxHearts, powerups]);
+  }, [processInputKey]);
 
   /**
    * Main 60 FPS Game Loop
@@ -636,6 +689,10 @@ export function useGameEngine(
     floatingTexts,
     stevePos,
     isFrozen: isFrozenRef.current,
+    isVirtualKeyboardOpen,
+    setIsVirtualKeyboardOpen,
+    sendVirtualKey: processInputKey,
+    selectTargetBlock,
     startGame,
     togglePause,
     triggerPowerup,

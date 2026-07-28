@@ -28,6 +28,8 @@ interface CanvasGameProps {
   stevePos: { x: number; y: number };
   biome: Biome;
   onDimensionsChange?: (w: number, h: number) => void;
+  onSelectBlock?: (id: string) => void;
+  onCanvasClick?: () => void;
 }
 
 export const CanvasGame: React.FC<CanvasGameProps> = ({
@@ -39,10 +41,47 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
   stevePos,
   biome,
   onDimensionsChange,
+  onSelectBlock,
+  onCanvasClick,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+
+  // Handle Touch/Click on Canvas
+  const handlePointerDown = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = dimensions.width / rect.width;
+    const scaleY = dimensions.height / rect.height;
+
+    const touchX = (e.clientX - rect.left) * scaleX;
+    const touchY = (e.clientY - rect.top) * scaleY;
+
+    // Check if clicked/tapped on any block
+    let hitBlockId: string | null = null;
+    for (const block of enemyBlocks) {
+      const halfW = block.width / 2 + 15;
+      const halfH = block.height / 2 + 25; // Include word label height
+      if (
+        Math.abs(block.x - touchX) <= halfW &&
+        Math.abs(block.y - touchY) <= halfH
+      ) {
+        hitBlockId = block.id;
+        break;
+      }
+    }
+
+    if (hitBlockId && onSelectBlock) {
+      onSelectBlock(hitBlockId);
+    }
+
+    if (onCanvasClick) {
+      onCanvasClick();
+    }
+  };
 
   // Responsive Container ResizeObserver
   useEffect(() => {
@@ -131,7 +170,8 @@ export const CanvasGame: React.FC<CanvasGameProps> = ({
         ref={canvasRef}
         width={dimensions.width}
         height={dimensions.height}
-        className="block w-full h-full pixelated"
+        onPointerDown={handlePointerDown}
+        className="block w-full h-full pixelated cursor-crosshair touch-none"
       />
     </div>
   );
