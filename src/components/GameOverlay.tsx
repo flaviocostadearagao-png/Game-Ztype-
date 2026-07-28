@@ -117,10 +117,16 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
   if (status === 'PLAYING') return null;
 
   return (
-    <div className="absolute inset-0 bg-black/80 backdrop-blur-md z-30 flex items-center justify-center p-3 sm:p-4 font-pixel select-none overflow-y-auto">
+    <div
+      onClick={(e) => e.stopPropagation()}
+      className="absolute inset-0 bg-black/80 backdrop-blur-md z-30 flex items-center justify-center p-3 sm:p-4 font-pixel select-none overflow-y-auto"
+    >
       {/* 1. START MENU OVERLAY */}
       {status === 'MENU' && (
-        <div className="mc-panel-dark max-w-xl w-full p-4 sm:p-7 flex flex-col items-center text-center space-y-5 animate-fadeIn">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mc-panel-dark max-w-xl w-full p-4 sm:p-7 flex flex-col items-center text-center space-y-5 animate-fadeIn"
+        >
           {/* Logo Title */}
           <div className="space-y-1.5 w-full">
             <div className="inline-flex items-center gap-1.5 bg-emerald-900/80 text-emerald-300 text-[10px] px-3 py-1 border border-emerald-500 uppercase tracking-widest font-bold rounded-none">
@@ -242,7 +248,7 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
                   type="button"
                   onClick={() => {
                     soundEngine.playLevelUp();
-                    onStartGame();
+                    onStartGame(settings.difficulty);
                   }}
                   className="mc-btn mc-btn-primary flex-1 py-3.5 text-sm text-yellow-200 font-bold flex items-center justify-center gap-2 tracking-wider"
                 >
@@ -366,7 +372,10 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
 
       {/* 2. GAME OVER OVERLAY */}
       {status === 'GAMEOVER' && (
-        <div className="mc-panel-dark max-w-lg w-full p-6 sm:p-8 flex flex-col items-center text-center space-y-5 animate-fadeIn">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mc-panel-dark max-w-lg w-full p-6 sm:p-8 flex flex-col items-center text-center space-y-5 animate-fadeIn"
+        >
           <div className="space-y-1">
             <h2 className="text-2xl sm:text-3xl font-bold text-red-500 text-pixel-shadow tracking-wider">
               FIM DE JOGO!
@@ -479,7 +488,10 @@ export const GameOverlay: React.FC<GameOverlayProps> = ({
 
       {/* 3. PAUSE OVERLAY */}
       {status === 'PAUSED' && (
-        <div className="mc-panel-dark max-w-md w-full p-6 flex flex-col items-center text-center space-y-6">
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="mc-panel-dark max-w-md w-full p-6 flex flex-col items-center text-center space-y-6"
+        >
           <h2 className="text-2xl font-bold text-yellow-300 text-pixel-shadow">
             JOGO PAUSADO
           </h2>

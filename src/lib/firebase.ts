@@ -23,6 +23,17 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
 
 export const auth = getAuth(app);
 
+// Helper to get or generate persistent local unique player ID
+export function getOrCreatePlayerId(): string {
+  if (typeof window === 'undefined') return 'anon_player';
+  let pid = localStorage.getItem('mc_typing_player_id');
+  if (!pid) {
+    pid = 'usr_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    localStorage.setItem('mc_typing_player_id', pid);
+  }
+  return pid;
+}
+
 // Helper to ensure user is logged in anonymously
 export async function ensureAnonymousAuth(): Promise<User> {
   if (auth.currentUser) {
@@ -44,6 +55,13 @@ export async function ensureAnonymousAuth(): Promise<User> {
         }
       }
     });
+  });
+}
+
+// Auto initialize anonymous auth silently on player entry
+if (typeof window !== 'undefined') {
+  ensureAnonymousAuth().catch((err) => {
+    console.warn('Aviso no login anônimo automático:', err);
   });
 }
 
@@ -71,12 +89,12 @@ export async function saveScoreToFirebase(entry: {
   levelReached: number;
 }) {
   try {
-    let uid = 'anon_' + Math.random().toString(36).substring(2, 9);
+    let uid = getOrCreatePlayerId();
     try {
       const user = await ensureAnonymousAuth();
       if (user?.uid) uid = user.uid;
     } catch (e) {
-      console.warn('Anonymous auth note (proceeding without auth token):', e);
+      console.warn('Anonymous auth note (proceeding with local persistent ID):', e);
     }
 
     const leaderboardCol = collection(db, 'leaderboard');

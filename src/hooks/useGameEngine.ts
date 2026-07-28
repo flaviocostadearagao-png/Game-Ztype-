@@ -129,7 +129,7 @@ export function useGameEngine(
     setStatus('PLAYING');
     setIsVirtualKeyboardOpen(true);
 
-    lastSpawnTimeRef.current = Date.now();
+    lastSpawnTimeRef.current = 0; // Force immediate block spawn on game start
     waveBlocksSpawnedRef.current = 0;
     waveTotalBlocksRef.current = 6;
     isFrozenRef.current = false;
@@ -137,6 +137,16 @@ export function useGameEngine(
     soundEngine.playLevelUp();
     soundEngine.startAmbientMusic();
   }, [settings.difficulty]);
+
+  /**
+   * Return to Main Menu
+   */
+  const goToMenu = useCallback(() => {
+    soundEngine.stopAmbientMusic();
+    setEnemyBlocks([]);
+    setCurrentTargetId(null);
+    setStatus('MENU');
+  }, []);
 
   /**
    * Pause / Resume Game
@@ -659,6 +669,7 @@ export function useGameEngine(
     sendVirtualKey: processInputKey,
     selectTargetBlock,
     startGame,
+    goToMenu,
     togglePause,
     triggerPowerup,
   };

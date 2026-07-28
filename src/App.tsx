@@ -8,7 +8,7 @@ import { MinecraftHUD } from './components/MinecraftHUD';
 import { GameOverlay } from './components/GameOverlay';
 import { WordListModal } from './components/WordListModal';
 import { useGameEngine } from './hooks/useGameEngine';
-import { GameSettings, PowerUpInventory } from './types';
+import { GameSettings, PowerUpInventory, Difficulty } from './types';
 import { soundEngine } from './utils/audio';
 
 export default function App() {
@@ -44,6 +44,7 @@ export default function App() {
     sendVirtualKey,
     selectTargetBlock,
     startGame,
+    goToMenu,
     togglePause,
     triggerPowerup,
   } = useGameEngine(dimensions.width, dimensions.height, settings);
@@ -73,17 +74,25 @@ export default function App() {
   }, []);
 
   const focusNativeInput = useCallback(() => {
-    if (hiddenInputRef.current) {
+    if (status === 'PLAYING' && hiddenInputRef.current) {
       hiddenInputRef.current.focus();
     }
-  }, []);
+  }, [status]);
 
-  const handleStartGameWithInput = useCallback(() => {
-    startGame();
+  const handleStartGameWithInput = useCallback((difficulty?: Difficulty) => {
+    startGame(difficulty);
     setTimeout(() => {
-      focusNativeInput();
+      if (hiddenInputRef.current) {
+        hiddenInputRef.current.focus();
+      }
     }, 100);
-  }, [startGame, focusNativeInput]);
+  }, [startGame]);
+
+  const handleContainerClick = () => {
+    if (status === 'PLAYING') {
+      focusNativeInput();
+    }
+  };
 
   const handleHiddenInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
@@ -96,7 +105,7 @@ export default function App() {
 
   return (
     <div
-      onClick={focusNativeInput}
+      onClick={handleContainerClick}
       className="w-screen h-screen relative bg-slate-950 overflow-hidden flex flex-col font-pixel text-white select-none"
     >
       {/* Hidden input element for native mobile/desktop device keyboard support */}
@@ -151,7 +160,7 @@ export default function App() {
         settings={settings}
         onStartGame={handleStartGameWithInput}
         onResumeGame={togglePause}
-        onGoToMenu={() => setStatus('MENU')}
+        onGoToMenu={goToMenu}
         onUpdateSettings={handleUpdateSettings}
         onOpenWordListModal={() => setIsWordListOpen(true)}
       />
